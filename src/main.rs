@@ -9,8 +9,24 @@ use burn::train::{
     metric::{AccuracyMetric, LossMetric},
 };
 
+use clap::{Parser, ValueEnum};
+
 use mnist::data::{MnistBatcher, MnistDataset};
-use mnist::model::ModelConfig;
+use mnist::model::{Model, ModelConfig};
+
+#[derive(Clone, Debug, ValueEnum)]
+enum Mode {
+    Debug,
+    Train,
+}
+
+#[derive(Parser, Debug)]
+#[command(version, long_about=None)]
+struct Args {
+    // Mode of program
+    #[arg(short, long)]
+    mode: Mode,
+}
 
 #[derive(Config, Debug)]
 pub struct TrainingConfig {
@@ -29,41 +45,51 @@ pub struct TrainingConfig {
 }
 
 fn main() {
-    type TrainAutodiffBackend = Autodiff<NdArray>;
-    // load the dataset
-    let batch_size = 4;
-    let num_workers = 4;
+    let args = Args::parse();
 
+    type TrainAutodiffBackend = Autodiff<NdArray>;
     let device = NdArrayDevice::default();
 
-    let config = TrainingConfig::new(ModelConfig::new(10, 256), AdamConfig::new());
+    match args.mode {
+        Mode::Debug => {
+            println!("Debug mode");
+        }
+        Mode::Train => {
+            // load the dataset
+            let batch_size = 4;
+            let num_workers = 4;
 
-    let batcher = MnistBatcher::<TrainAutodiffBackend>::new(device);
-    let test_batcher = MnistBatcher::<NdArray>::new(device);
-    let dataloader_train = DataLoaderBuilder::new(batcher)
-        .batch_size(batch_size)
-        .shuffle(config.seed)
-        .num_workers(num_workers)
-        .build(MnistDataset::train());
+            let config = TrainingConfig::new(ModelConfig::new(10, 256), AdamConfig::new());
 
-    let dataloader_test = DataLoaderBuilder::new(test_batcher)
-        .batch_size(batch_size)
-        .shuffle(config.seed)
-        .num_workers(num_workers)
-        .build(MnistDataset::test());
+            let batcher = MnistBatcher::<TrainAutodiffBackend>::new(device);
+            let test_batcher = MnistBatcher::<NdArray>::new(device);
+            let dataloader_train = DataLoaderBuilder::new(batcher)
+                .batch_size(batch_size)
+                .shuffle(config.seed)
+                .num_workers(num_workers)
+                .build(MnistDataset::train());
 
-    let training = SupervisedTraining::new("checkpoints", dataloader_train, dataloader_test)
-        .metrics((AccuracyMetric::new(), LossMetric::new()))
-        .with_file_checkpointer(CompactRecorder::new())
-        .num_epochs(config.num_epochs)
-        .summary();
+            let dataloader_test = DataLoaderBuilder::new(test_batcher)
+                .batch_size(batch_size)
+                .shuffle(config.seed)
+                .num_workers(num_workers)
+                .build(MnistDataset::test());
 
-    let model = config.model.init::<TrainAutodiffBackend>(&device);
-    let result = training.launch(Learner::new(
-        model,
-        config.optimizer.init(),
-        config.learning_rate,
-    ));
+            let training =
+                SupervisedTraining::new("checkpoints", dataloader_train, dataloader_test)
+                    .metrics((AccuracyMetric::new(), LossMetric::new()))
+                    .with_file_checkpointer(CompactRecorder::new())
+                    .num_epochs(config.num_epochs)
+                    .summary();
 
-    result.model.save_file("models", &CompactRecorder::new());
+            let model = config.model.init::<TrainAutodiffBackend>(&device);
+            let result = training.launch(Learner::new(
+                model,
+                config.optimizer.init(),
+                config.learning_rate,
+            ));
+
+            let _ = result.model.save_file("models", &CompactRecorder::new());
+        }
+    }
 }
