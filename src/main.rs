@@ -13,6 +13,7 @@ use clap::{Parser, ValueEnum};
 
 use mnist::data::{MnistBatcher, MnistDataset};
 use mnist::model::{Model, ModelConfig};
+use mnist::nn_debug::Debugger;
 
 #[derive(Clone, Debug, ValueEnum)]
 enum Mode {
@@ -50,16 +51,18 @@ fn main() {
     type TrainAutodiffBackend = Autodiff<NdArray>;
     let device = NdArrayDevice::default();
 
+    let config = TrainingConfig::new(ModelConfig::new(10, 256), AdamConfig::new());
+    let model = config.model.init::<TrainAutodiffBackend>(&device);
+
     match args.mode {
         Mode::Debug => {
-            println!("Debug mode");
+            let dbg = Debugger::new(model);
+            dbg.analyze::<NdArray>(&device);
         }
         Mode::Train => {
             // load the dataset
             let batch_size = 4;
             let num_workers = 4;
-
-            let config = TrainingConfig::new(ModelConfig::new(10, 256), AdamConfig::new());
 
             let batcher = MnistBatcher::<TrainAutodiffBackend>::new(device);
             let test_batcher = MnistBatcher::<NdArray>::new(device);
@@ -82,7 +85,6 @@ fn main() {
                     .num_epochs(config.num_epochs)
                     .summary();
 
-            let model = config.model.init::<TrainAutodiffBackend>(&device);
             let result = training.launch(Learner::new(
                 model,
                 config.optimizer.init(),
