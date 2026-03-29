@@ -1,8 +1,5 @@
+extern crate nalgebra as na;
 use burn::{Tensor, prelude::Backend, tensor::TensorData};
-
-use ndarray::Array2;
-//use ndarray_linalg::{Eigh, UPLO};
-
 use std::collections::BTreeMap;
 
 pub trait Introspect {
@@ -31,12 +28,8 @@ impl<M: Introspect> Debugger<M> {
         let x_data = x.to_data();
         let values: Vec<f32> = x_data.to_vec().unwrap();
         let n = x.dims()[0];
-
-        // ndarray matrix
-        let matrix = Array2::from_shape_vec((n, n), values).unwrap();
-        //let (eigenval, eigenvec) = matrix.eigh(UPLO::Lower).unwrap();
-
-        println!("{:?}", matrix);
+        let matrix = na::DMatrix::from_vec(n, n, values);
+        let eigen = na::linalg::SymmetricEigen::new(matrix);
+        println!("{:?}", eigen.eigenvalues);
     }
 }
-
