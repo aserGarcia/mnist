@@ -56,7 +56,7 @@ fn main() {
 
     match args.mode {
         Mode::Debug => {
-            let dbg = Debugger::new(model);
+            let mut dbg = Debugger::new(model);
             dbg.analyze::<NdArray>(&device);
         }
         Mode::Train => {

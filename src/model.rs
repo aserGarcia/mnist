@@ -45,7 +45,6 @@ impl<B: Backend> Introspect for Model<B> {
     fn get_weights(&self) -> BTreeMap<&str, TensorData> {
         let mut weights = BTreeMap::new();
 
-        weights.insert("conv1", self.conv1.weight.to_data());
         weights.insert("linear1", self.linear1.weight.to_data());
         weights.insert("linear2", self.linear2.weight.to_data());
 
